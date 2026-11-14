@@ -17,7 +17,7 @@ const MONTHS_N = ['январь','февраль','март','апрель','м�
 
 const tripYear = t => t.start ? +t.start.slice(0, 4) : (+t.year || 0);
 function fmtDates(t, short) {
-  if (!t.start) return t.year ? String(t.year) : '';
+  if (!t.start) return t.year ? (t.month ? `${MONTHS_N[t.month - 1]} ${t.year}` : String(t.year)) : '';
   const [y1, m1, d1] = t.start.split('-').map(Number);
   if (!t.end || t.end === t.start) return short ? `${d1} ${MONTHS[m1-1]}` : `${d1} ${MONTHS[m1-1]} ${y1}`;
   const [y2, m2, d2] = t.end.split('-').map(Number);
@@ -29,7 +29,8 @@ function fmtDates(t, short) {
 }
 const days = t => (t.start && t.end) ? Math.round((new Date(t.end) - new Date(t.start)) / 864e5) + 1 : 0;
 const tripTitle = t => t.title || t.cities || (t.countries || []).map(cname).join(', ') || 'Поездка';
-const sortTrips = arr => arr.slice().sort((a, b) => (b.start || String(tripYear(b))).localeCompare(a.start || String(tripYear(a))));
+const sortKey = t => t.start || (tripYear(t) + (t.month ? '-' + String(t.month).padStart(2, '0') : ''));
+const sortTrips = arr => arr.slice().sort((a, b) => sortKey(b).localeCompare(sortKey(a)));
 
 let state = { filter: null, editing: false, dir: null, view: 'short' };
 
@@ -406,7 +407,8 @@ function openForm(orig) {
       <div class="row">
         <div class="field"><label>С</label><input type="date" id="fs" value="${esc(t.start)}"></div>
         <div class="field"><label>По</label><input type="date" id="fe" value="${esc(t.end)}"></div>
-        <div class="field"><label>или только год</label><input type="number" id="fy" min="1950" max="2100" value="${esc(t.year || '')}" placeholder="2015"></div>
+        <div class="field"><label>или год</label><input type="number" id="fy" min="1950" max="2100" value="${esc(t.year || '')}" placeholder="2015"></div>
+        <div class="field"><label>и месяц</label><select id="fm"><option value="">—</option>${MONTHS_N.map((m, i) => `<option value="${i + 1}"${+t.month === i + 1 ? ' selected' : ''}>${m}</option>`).join('')}</select></div>
       </div>
       <div class="field"><label>Города</label><input id="fcity" value="${esc(t.cities)}" placeholder="Лиссабон, Синтра, Порту"></div>
       <div class="field"><label>Маршрут</label><input id="froute" value="${esc(t.route || '')}" placeholder="Москва → Стамбул → Тель-Авив"></div>
@@ -423,7 +425,7 @@ function openForm(orig) {
       <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:18px">
         <button type="button" class="btn" id="fcancel">Отмена</button><button type="submit" class="btn primary">Сохранить</button>
       </div></form>`);
-    const collect = () => { t.title = $('#ftitle').value.trim(); t.start = $('#fs').value; t.end = $('#fe').value; t.year = $('#fy').value ? +$('#fy').value : ''; t.cities = $('#fcity').value.trim(); t.route = $('#froute').value.trim(); t.stay = $('#fstay').value.trim(); t.with = $('#fwith').value.trim(); t.notes = $('#fnotes').value; };
+    const collect = () => { t.title = $('#ftitle').value.trim(); t.start = $('#fs').value; t.end = $('#fe').value; t.year = $('#fy').value ? +$('#fy').value : ''; t.month = $('#fm').value ? +$('#fm').value : ''; t.cities = $('#fcity').value.trim(); t.route = $('#froute').value.trim(); t.stay = $('#fstay').value.trim(); t.with = $('#fwith').value.trim(); t.notes = $('#fnotes').value; };
     const cancel = async () => { if (isNew) await removePhotoDir(t.id); else for (const p of added) await removePhotoFilesFix(t, p); closeModal(); if (orig) openTrip(orig.id); };
     $('#fx').onclick = cancel; $('#fcancel').onclick = cancel;
     $('#cin').onchange = e => { const c = codeFromName(e.target.value); if (c && !t.countries.includes(c)) { collect(); t.countries.push(c); draw(); $('#cin').focus(); } else if (!c) toast('Не нашёл такую страну — выбери из подсказок'); };
@@ -441,7 +443,7 @@ function openForm(orig) {
       if (!t.countries.length) { toast('Добавь хотя бы одну страну'); return; }
       if (!t.start && !t.year) { toast('Укажи даты или хотя бы год'); return; }
       if (t.start && !t.end) t.end = t.start;
-      if (t.start) t.year = '';
+      if (t.start) { t.year = ''; t.month = ''; }
       for (const p of t._removed || []) await removePhotoFilesFix(t, p);
       delete t._removed;
       if (isNew) J.trips.push(t); else J.trips[J.trips.indexOf(orig)] = t;
