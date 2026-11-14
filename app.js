@@ -133,9 +133,9 @@ function zoomTo(c) {
     geom = big;
   }
   const [[x0, y0], [x1, y1]] = path.bounds(geom);
-  const k = Math.min(6, 0.55 / Math.max((x1 - x0) / W, (y1 - y0) / H));
+  const k = Math.min(6, 0.55 / Math.max((x1 - x0) / view.w, (y1 - y0) / H));
   const kk = Math.max(1.4, k);
-  svg.transition().duration(650).call(zoom.transform, d3.zoomIdentity.translate(W / 2, H / 2).scale(kk).translate(-(x0 + x1) / 2, -(y0 + y1) / 2));
+  svg.transition().duration(650).call(zoom.transform, d3.zoomIdentity.translate(view.x + view.w / 2, H / 2).scale(kk).translate(-(x0 + x1) / 2, -(y0 + y1) / 2));
 }
 
 /* ---------------- log ---------------- */
@@ -192,7 +192,26 @@ function renderLog() {
   if (state.editing) $('#bucketIn').onchange = async e => { const c = codeFromName(e.target.value); if (c && !J.bucket.includes(c)) { J.bucket.push(c); await save(); renderAll(); } else e.target.value = ''; };
 }
 
-function renderAll() { renderHeader(); renderMap(); renderLog(); }
+/* На телефоне показываем не весь мир, а более узкое «окно» (выше и крупнее) с центром на посещённых странах.
+   Остальное — свайпом в стороны. */
+const view = { x: 0, w: W, mobile: null };
+function layoutMap(force) {
+  const mobile = window.innerWidth < 720;
+  if (!force && mobile === view.mobile) return;
+  view.mobile = mobile;
+  if (mobile) {
+    view.w = Math.round(H * 1.15);
+    const xs = Object.keys(byCountry).filter(c => c !== J.home && WORLD_ANCHORS[c]).map(c => projection(WORLD_ANCHORS[c])[0]).sort((a, b) => a - b);
+    const cx = xs.length ? xs[Math.floor(xs.length / 2)] : W * 0.55;
+    view.x = Math.round(Math.max(0, Math.min(W - view.w, cx - view.w / 2)));
+  } else { view.x = 0; view.w = W; }
+  svg.attr('viewBox', `${view.x} 0 ${view.w} ${H}`);
+  zoom.extent([[view.x, 0], [view.x + view.w, H]]);
+  svg.call(zoom.transform, d3.zoomIdentity);
+}
+let resizeT; window.addEventListener('resize', () => { clearTimeout(resizeT); resizeT = setTimeout(() => layoutMap(false), 200); });
+let firstLayout = true;
+function renderAll() { renderHeader(); renderMap(); if (firstLayout) { layoutMap(true); firstLayout = false; } renderLog(); }
 
 /* ---------------- trip view ---------------- */
 const modal = $('#modal'), sheet = $('#sheet');
