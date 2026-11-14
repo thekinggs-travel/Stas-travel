@@ -1,2 +1,5 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+# зашифрованные файлы — строго бинарные, git не должен их трогать
+*.enc binary
+*.bin binary
