@@ -8,7 +8,7 @@ J.trips = J.trips || []; J.bucket = J.bucket || [];
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const RN = new Intl.DisplayNames(['ru'], { type: 'region' });
-const NAMES = { KR: 'Южная Корея', KP: 'Северная Корея', US: 'США', GB: 'Великобритания', AE: 'ОАЭ', HK: 'Гонконг', MO: 'Макао', CZ: 'Чехия', VA: 'Ватикан' };
+const NAMES = { CG: 'Республика Конго', CD: 'ДР Конго', MM: 'Мьянма', PS: 'Палестина', KR: 'Южная Корея', KP: 'Северная Корея', US: 'США', GB: 'Великобритания', AE: 'ОАЭ', HK: 'Гонконг', MO: 'Макао', CZ: 'Чехия', VA: 'Ватикан' };
 const cname = c => NAMES[c] || (() => { try { return RN.of(c) || c; } catch { return c; } })();
 const flag = c => c.length === 2 ? String.fromCodePoint(...[...c.toUpperCase()].map(ch => 0x1F1A5 + ch.charCodeAt(0))) : '';
 const plural = (n, a, b, c) => { const m10 = n % 10, m100 = n % 100; return n + ' ' + (m10 === 1 && m100 !== 11 ? a : m10 >= 2 && m10 <= 4 && (m100 < 10 || m100 >= 20) ? b : c); };
@@ -91,9 +91,13 @@ svg.on('click', e => { if (e.target === svg.node() || e.target.classList.contain
 const tip = $('#tip');
 function showTip(e, html) {
   const r = $('.map-card').getBoundingClientRect();
-  tip.innerHTML = html; tip.style.left = (e.clientX - r.left) + 'px'; tip.style.top = (e.clientY - r.top) + 'px'; tip.style.opacity = 1;
+  tip.innerHTML = html; tip.style.opacity = 1;
+  const half = tip.offsetWidth / 2 + 6;
+  tip.style.left = Math.max(half, Math.min(r.width - half, e.clientX - r.left)) + 'px'; tip.style.top = (e.clientY - r.top) + 'px';
 }
-const hideTip = () => tip.style.opacity = 0;
+let tipT; const hideTip = () => { clearTimeout(tipT); tip.style.opacity = 0; };
+// на телефоне наведения нет — по тапу показываем подсказку на пару секунд
+const flashTip = (e, html) => { showTip(e, html); clearTimeout(tipT); tipT = setTimeout(() => tip.style.opacity = 0, 2500); };
 let byCountry = {};
 const pinR = d => 3.2 + Math.min(byCountry[d]?.trips.length || 1, 6) * 0.5;
 
@@ -109,16 +113,16 @@ function renderMap() {
   countryPaths
     .attr('class', d => 'country' + (byCountry[d.id] && d.id !== J.home ? ' visited' : '') + (d.id === J.home ? ' home' : '')
       + (!byCountry[d.id] && J.bucket.includes(d.id) ? ' bucket' : '') + (state.filter === d.id ? ' sel' : ''))
-    .on('mousemove', (e, d) => (byCountry[d.id] || d.id === J.home || J.bucket.includes(d.id)) ? showTip(e, countryTip(d.id)) : hideTip())
+    .on('mousemove', (e, d) => showTip(e, countryTip(d.id)))
     .on('mouseleave', hideTip)
-    .on('click', (e, d) => { e.stopPropagation(); if (byCountry[d.id]) { setFilter(d.id); zoomTo(d.id); } });
+    .on('click', (e, d) => { e.stopPropagation(); flashTip(e, countryTip(d.id)); if (byCountry[d.id]) { setFilter(d.id); zoomTo(d.id); } });
   const pins = Object.keys(byCountry).filter(c => c !== J.home && WORLD_ANCHORS[c]);
   gP.selectAll('circle').data(pins, d => d).join('circle')
     .attr('class', d => 'pin' + (state.filter === d ? ' sel' : ''))
     .attr('cx', d => projection(WORLD_ANCHORS[d])[0]).attr('cy', d => projection(WORLD_ANCHORS[d])[1])
     .attr('r', d => pinR(d) / Math.sqrt(zk))
     .on('mousemove', (e, d) => showTip(e, countryTip(d))).on('mouseleave', hideTip)
-    .on('click', (e, d) => { e.stopPropagation(); setFilter(d); zoomTo(d); });
+    .on('click', (e, d) => { e.stopPropagation(); flashTip(e, countryTip(d)); setFilter(d); zoomTo(d); });
 }
 
 function zoomTo(c) {
